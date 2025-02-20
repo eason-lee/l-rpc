@@ -41,14 +41,24 @@ type TCPTransport struct {
 	encryptor      Encryptor
 }
 
-func NewTCPTransport(conn net.Conn, opts TransportOpts) *TCPTransport {
-	return &TCPTransport{
+func NewTCPTransport(conn net.Conn, opts ...TransportOpts) *TCPTransport {
+	opt :=  TransportOpts{
+		Compressor: &GzipCompressor{},
+		Encryptor:  NewAESEncryptor([]byte("default-secure-key-12345")),
+	}
+    if len(opts) > 0 {
+        opt = opts[0]
+    }
+	t :=  &TCPTransport{
 		conn:           conn,
 		heartbeatStop:  make(chan struct{}),
 		lastActiveTime: time.Now(),
-		compressor:     opts.Compressor,
-		encryptor:      opts.Encryptor,
+		compressor:     opt.Compressor,
+		encryptor:      opt.Encryptor,
 	}
+	go t.heartbeat()
+	
+	return t
 }
 
 func (t *TCPTransport) heartbeat() {
