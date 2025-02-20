@@ -14,6 +14,14 @@ type ServiceInstance struct {
 	Endpoints []string          // 服务地址列表
 	Status    ServiceStatus     // 服务状态
 	LastHeartbeat time.Time    // 最后心跳时间
+    // 新增健康检查相关字段
+    HealthCheck   *HealthCheck
+}
+
+type HealthCheck struct {
+    Interval time.Duration    // 健康检查间隔
+    Timeout  time.Duration    // 健康检查超时时间
+    URL      string          // 健康检查地址
 }
 
 type ServiceStatus int
@@ -21,6 +29,8 @@ type ServiceStatus int
 const (
 	StatusUp ServiceStatus = iota
 	StatusDown
+    defaultHealthCheckInterval = 10 * time.Second
+    defaultHealthCheckTimeout = 5 * time.Second
 )
 
 // Registry 注册中心接口
@@ -46,14 +56,22 @@ type Registry interface {
 
 // InMemoryRegistry 基于内存的注册中心实现
 type InMemoryRegistry struct {
-	services   map[string][]*ServiceInstance  // 服务实例列表
-	subscribers map[string][]chan []*ServiceInstance  // 服务变更订阅者
-	mu         sync.RWMutex
+    services    map[string][]*ServiceInstance
+    subscribers map[string][]chan []*ServiceInstance
+    mu          sync.RWMutex
+    health      *HealthChecker
 }
 
 func NewInMemoryRegistry() *InMemoryRegistry {
-	return &InMemoryRegistry{
-		services:    make(map[string][]*ServiceInstance),
-		subscribers: make(map[string][]chan []*ServiceInstance),
-	}
+    r := &InMemoryRegistry{
+        services:    make(map[string][]*ServiceInstance),
+        subscribers: make(map[string][]chan []*ServiceInstance),
+    }
+    r.health = NewHealthChecker(r)
+    return r
+}
+
+// 实现 RegistryNotifier 接口
+func (r *InMemoryRegistry) NotifyStatusChange(serviceName string, instance *ServiceInstance) {
+    r.notifySubscribers(serviceName)
 }

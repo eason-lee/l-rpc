@@ -2,43 +2,46 @@ package registry
 
 import (
 	"errors"
+	"time"
 )
 
 func (r *InMemoryRegistry) Register(instance *ServiceInstance) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+    r.mu.Lock()
+    defer r.mu.Unlock()
 
-	instances := r.services[instance.Name]
+    instance.LastHeartbeat = time.Now()
+    instances := r.services[instance.Name]
 
-	// 检查是否已存在
-	for i, inst := range instances {
-		if inst.ID == instance.ID {
-			instances[i] = instance
-			r.notifySubscribers(instance.Name)
-			return nil
-		}
-	}
+    for i, inst := range instances {
+        if inst.ID == instance.ID {
+            instances[i] = instance
+            r.health.AddInstance(instance)
+            r.notifySubscribers(instance.Name)
+            return nil
+        }
+    }
 
-	// 添加新实例
-	r.services[instance.Name] = append(instances, instance)
-	r.notifySubscribers(instance.Name)
-	return nil
+    r.services[instance.Name] = append(instances, instance)
+    r.health.AddInstance(instance)
+    r.notifySubscribers(instance.Name)
+    return nil
 }
 
 func (r *InMemoryRegistry) Deregister(instanceID string) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+    r.mu.Lock()
+    defer r.mu.Unlock()
 
-	for name, instances := range r.services {
-		for i, inst := range instances {
-			if inst.ID == instanceID {
-				r.services[name] = append(instances[:i], instances[i+1:]...)
-				r.notifySubscribers(name)
-				return nil
-			}
-		}
-	}
-	return errors.New("instance not found")
+    for name, instances := range r.services {
+        for i, inst := range instances {
+            if inst.ID == instanceID {
+                r.health.RemoveInstance(instanceID)
+                r.services[name] = append(instances[:i], instances[i+1:]...)
+                r.notifySubscribers(name)
+                return nil
+            }
+        }
+    }
+    return errors.New("instance not found")
 }
 
 func (r *InMemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
