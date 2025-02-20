@@ -43,17 +43,21 @@ func NewPool(config PoolConfig) (*Pool, error) {
 }
 
 func (p *Pool) Get() (*TCPTransport, error) {
-	if p.closed {
-		return nil, errors.New("pool is closed")
-	}
+    if p.closed {
+        return nil, errors.New("pool is closed")
+    }
 
-	// 优先从空闲连接中获取
-	select {
-	case conn := <-p.conns:
-		return conn, nil
-	default:
-		return p.factory()
-	}
+    select {
+    case conn := <-p.conns:
+        // 检查连接是否存活
+        if time.Since(conn.lastActiveTime) > p.idleTimeout {
+            conn.Close()
+            return p.factory()
+        }
+        return conn, nil
+    default:
+        return p.factory()
+    }
 }
 
 func (p *Pool) Put(conn *TCPTransport) error {
