@@ -2,8 +2,6 @@ package registry
 
 import (
 	"errors"
-	"sync"
-	"time"
 )
 
 func (r *InMemoryRegistry) Register(instance *ServiceInstance) error {
