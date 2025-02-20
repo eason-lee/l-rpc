@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"errors"
 	"sync"
 	"time"
 )
@@ -64,7 +63,7 @@ func (r *MemoryRegistry) Deregister(instanceID string) error {
 			}
 		}
 	}
-	return errors.New("instance not found")
+	return ErrServiceNotFound
 }
 
 func (r *MemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
@@ -73,7 +72,7 @@ func (r *MemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
 
 	instances, ok := r.services[name]
 	if !ok {
-		return nil, errors.New("service not found")
+		return nil, ErrServiceNotFound
 	}
 	return instances, nil
 }
@@ -120,4 +119,21 @@ func (r *MemoryRegistry) notifySubscribers(serviceName string) {
 			// 如果通道已满，跳过本次通知
 		}
 	}
+}
+
+func (r *MemoryRegistry) SelectInstance(serviceName string, balancer LoadBalancer) (*ServiceInstance, error) {
+	instances, err := r.GetService(serviceName)
+	if err != nil {
+		return nil, err
+	}
+	
+	// 过滤出健康的实例
+	var healthyInstances []*ServiceInstance
+	for _, inst := range instances {
+		if inst.Status == StatusUp {
+			healthyInstances = append(healthyInstances, inst)
+		}
+	}
+	
+	return balancer.Select(healthyInstances)
 }

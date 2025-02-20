@@ -188,3 +188,20 @@ func (r *ConsulRegistry) convertStatus(status string) ServiceStatus {
 		return StatusDown
 	}
 }
+
+func (r *ConsulRegistry) SelectInstance(serviceName string, balancer LoadBalancer) (*ServiceInstance, error) {
+	instances, err := r.GetService(serviceName)
+	if err != nil {
+		return nil, err
+	}
+	
+	// 过滤出健康的实例
+	var healthyInstances []*ServiceInstance
+	for _, inst := range instances {
+		if inst.Status == StatusUp {
+			healthyInstances = append(healthyInstances, inst)
+		}
+	}
+	
+	return balancer.Select(healthyInstances)
+}

@@ -51,5 +51,8 @@ type Registry interface {
 	
 	// Unsubscribe 取消订阅
 	Unsubscribe(serviceName string) error
+	
+	// 新增负载均衡相关方法
+	SelectInstance(serviceName string, balancer LoadBalancer) (*ServiceInstance, error)
 }
 
