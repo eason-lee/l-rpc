@@ -10,7 +10,7 @@ import (
 
 type RegistryTestSuite struct {
 	suite.Suite
-	registry *InMemoryRegistry
+	registry *MemoryRegistry
 }
 
 func (s *RegistryTestSuite) SetupTest() {

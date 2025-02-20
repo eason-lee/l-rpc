@@ -1,7 +1,6 @@
 package registry
 
 import (
-	"sync"
 	"time"
 )
 
@@ -54,24 +53,3 @@ type Registry interface {
 	Unsubscribe(serviceName string) error
 }
 
-// InMemoryRegistry 基于内存的注册中心实现
-type InMemoryRegistry struct {
-    services    map[string][]*ServiceInstance
-    subscribers map[string][]chan []*ServiceInstance
-    mu          sync.RWMutex
-    health      *HealthChecker
-}
-
-func NewInMemoryRegistry() *InMemoryRegistry {
-    r := &InMemoryRegistry{
-        services:    make(map[string][]*ServiceInstance),
-        subscribers: make(map[string][]chan []*ServiceInstance),
-    }
-    r.health = NewHealthChecker(r)
-    return r
-}
-
-// 实现 RegistryNotifier 接口
-func (r *InMemoryRegistry) NotifyStatusChange(serviceName string, instance *ServiceInstance) {
-    r.notifySubscribers(serviceName)
-}

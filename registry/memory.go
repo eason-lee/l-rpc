@@ -2,49 +2,72 @@ package registry
 
 import (
 	"errors"
+	"sync"
 	"time"
 )
 
-func (r *InMemoryRegistry) Register(instance *ServiceInstance) error {
-    r.mu.Lock()
-    defer r.mu.Unlock()
-
-    instance.LastHeartbeat = time.Now()
-    instances := r.services[instance.Name]
-
-    for i, inst := range instances {
-        if inst.ID == instance.ID {
-            instances[i] = instance
-            r.health.AddInstance(instance)
-            r.notifySubscribers(instance.Name)
-            return nil
-        }
-    }
-
-    r.services[instance.Name] = append(instances, instance)
-    r.health.AddInstance(instance)
-    r.notifySubscribers(instance.Name)
-    return nil
+// MemoryRegistry 基于内存的注册中心实现
+type MemoryRegistry struct {
+	services    map[string][]*ServiceInstance
+	subscribers map[string][]chan []*ServiceInstance
+	mu          sync.RWMutex
+	health      *HealthChecker
 }
 
-func (r *InMemoryRegistry) Deregister(instanceID string) error {
-    r.mu.Lock()
-    defer r.mu.Unlock()
-
-    for name, instances := range r.services {
-        for i, inst := range instances {
-            if inst.ID == instanceID {
-                r.health.RemoveInstance(instanceID)
-                r.services[name] = append(instances[:i], instances[i+1:]...)
-                r.notifySubscribers(name)
-                return nil
-            }
-        }
-    }
-    return errors.New("instance not found")
+func NewInMemoryRegistry() *MemoryRegistry {
+	r := &MemoryRegistry{
+		services:    make(map[string][]*ServiceInstance),
+		subscribers: make(map[string][]chan []*ServiceInstance),
+	}
+	r.health = NewHealthChecker(r)
+	return r
 }
 
-func (r *InMemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
+// 实现 RegistryNotifier 接口
+func (r *MemoryRegistry) NotifyStatusChange(serviceName string, instance *ServiceInstance) {
+	r.notifySubscribers(serviceName)
+}
+
+func (r *MemoryRegistry) Register(instance *ServiceInstance) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	instance.LastHeartbeat = time.Now()
+	instances := r.services[instance.Name]
+
+	for i, inst := range instances {
+		if inst.ID == instance.ID {
+			instances[i] = instance
+			r.health.AddInstance(instance)
+			r.notifySubscribers(instance.Name)
+			return nil
+		}
+	}
+
+	r.services[instance.Name] = append(instances, instance)
+	r.health.AddInstance(instance)
+	r.notifySubscribers(instance.Name)
+	return nil
+}
+
+func (r *MemoryRegistry) Deregister(instanceID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for name, instances := range r.services {
+		for i, inst := range instances {
+			if inst.ID == instanceID {
+				r.health.RemoveInstance(instanceID)
+				r.services[name] = append(instances[:i], instances[i+1:]...)
+				r.notifySubscribers(name)
+				return nil
+			}
+		}
+	}
+	return errors.New("instance not found")
+}
+
+func (r *MemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -55,7 +78,7 @@ func (r *InMemoryRegistry) GetService(name string) ([]*ServiceInstance, error) {
 	return instances, nil
 }
 
-func (r *InMemoryRegistry) ListServices() ([]*ServiceInstance, error) {
+func (r *MemoryRegistry) ListServices() ([]*ServiceInstance, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -66,7 +89,7 @@ func (r *InMemoryRegistry) ListServices() ([]*ServiceInstance, error) {
 	return result, nil
 }
 
-func (r *InMemoryRegistry) Subscribe(serviceName string) (<-chan []*ServiceInstance, error) {
+func (r *MemoryRegistry) Subscribe(serviceName string) (<-chan []*ServiceInstance, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -80,7 +103,7 @@ func (r *InMemoryRegistry) Subscribe(serviceName string) (<-chan []*ServiceInsta
 	return ch, nil
 }
 
-func (r *InMemoryRegistry) Unsubscribe(serviceName string) error {
+func (r *MemoryRegistry) Unsubscribe(serviceName string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -88,7 +111,7 @@ func (r *InMemoryRegistry) Unsubscribe(serviceName string) error {
 	return nil
 }
 
-func (r *InMemoryRegistry) notifySubscribers(serviceName string) {
+func (r *MemoryRegistry) notifySubscribers(serviceName string) {
 	instances := r.services[serviceName]
 	for _, ch := range r.subscribers[serviceName] {
 		select {
