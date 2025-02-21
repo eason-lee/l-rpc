@@ -1,25 +1,45 @@
 package protocol
 
-// MessageType 定义消息类型
+import "time"
+
+// MessageType 消息类型
 type MessageType byte
 
 const (
-    Request  MessageType = iota // 请求消息
-    Response                    // 响应消息
+	// 请求消息类型
+	TypeRequest MessageType = iota
+	// 响应消息类型
+	TypeResponse
+	// 心跳消息类型
+	TypeHeartbeat
 )
 
-// Message 定义 RPC 消息格式
+// Message RPC消息结构
 type Message struct {
-    Header Header
-    Data   []byte
+	// 消息头
+	Header *Header
+	// 消息体
+	Data []byte
 }
 
-// Header 定义消息头
+// Header 消息头
 type Header struct {
-    MessageType MessageType // 消息类型：请求/响应
-    RequestID   uint64     // 请求ID，用于匹配请求和响应
-    ServiceName string     // 服务名称
-    MethodName  string     // 方法名称
-    Error       string     // 错误信息，响应时使用
-    DataLen     uint32     // 数据长度
+	// 消息ID
+	ID uint64
+	// 消息类型
+	Type MessageType
+	// 压缩类型
+	Compress uint8
+	// 序列化类型
+	Codec string
+	// 服务名称
+	ServiceName string
+	// 方法名称
+	MethodName string
+	// 元数据
+	Metadata map[string]string
+	// 超时时间
+	Timeout time.Duration
+	// 错误信息
+	Error string
 }
