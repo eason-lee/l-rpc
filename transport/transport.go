@@ -11,7 +11,7 @@ import (
 
 // Transport 定义传输层接口
 type Transport interface {
-	Send(data []byte) error
+	Send(data []byte) ([]byte, error)
 	Receive() ([]byte, error)
 	Close() error
 }
@@ -79,9 +79,6 @@ func (t *TCPTransport) heartbeat() {
 }
 
 func (t *TCPTransport) sendHeartbeat() error {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
 	heartbeat := HeartbeatMessage{
 		Type:    0, // ping
 		TimeNow: time.Now().UnixNano(),
@@ -96,7 +93,10 @@ func (t *TCPTransport) sendHeartbeat() error {
 	t.conn.SetWriteDeadline(time.Now().Add(heartbeatTimeout))
 	defer t.conn.SetWriteDeadline(time.Time{})
 
-	return t.Send(data)
+	// 直接调用 send 方法，避免死锁
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.send(data)
 }
 
 func (t *TCPTransport) updateLastActiveTime() {
@@ -106,33 +106,18 @@ func (t *TCPTransport) updateLastActiveTime() {
 }
 
 // Send 发送数据
-func (t *TCPTransport) Send(data []byte) error {
-	t.updateLastActiveTime()
+func (t *TCPTransport) Send(data []byte) ([]byte, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
 
-	if t.compressor != nil {
-		var err error
-		data, err = t.compressor.Compress(data)
-		if err != nil {
-			return err
-		}
+	// 发送数据
+	err := t.send(data)
+	if err != nil {
+		return nil, err
 	}
 
-	if t.encryptor != nil {
-		var err error
-		data, err = t.encryptor.Encrypt(data)
-		if err != nil {
-			return err
-		}
-	}
-
-	// 先发送数据长度
-	length := uint32(len(data))
-	if err := binary.Write(t.conn, binary.BigEndian, length); err != nil {
-		return err
-	}
-	// 发送数据内容
-	_, err := t.conn.Write(data)
-	return err
+	// 接收响应
+	return t.receive()
 }
 
 // receive 接收原始数据
@@ -176,6 +161,36 @@ func (t *TCPTransport) Receive() ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// send 发送原始数据
+func (t *TCPTransport) send(data []byte) error {
+	// 压缩数据
+	if t.compressor != nil {
+		var err error
+		data, err = t.compressor.Compress(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 加密数据
+	if t.encryptor != nil {
+		var err error
+		data, err = t.encryptor.Encrypt(data)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 写入数据长度
+	if err := binary.Write(t.conn, binary.BigEndian, uint32(len(data))); err != nil {
+		return err
+	}
+
+	// 写入数据内容
+	_, err := t.conn.Write(data)
+	return err
 }
 
 func (t *TCPTransport) Close() error {

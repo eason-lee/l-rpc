@@ -1,6 +1,8 @@
 package transport
 
 import (
+	"context"
+	"lisen/l-rpc/protocol"
 	"net"
 	"time"
 )
@@ -38,14 +40,29 @@ func NewClient(network, addr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) Send(data []byte) error {
-	conn, err := c.pool.Get()
+func (c *Client) Send(ctx context.Context, message *protocol.Message) (*protocol.Message, error) {
+	// 获取连接
+	trans, err := c.pool.Get()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer c.pool.Put(conn)
+	defer c.pool.Put(trans)
 
-	return conn.Send(data)
+	// 编码消息
+	codec := protocol.NewDefaultCodec()
+	data, err := codec.Encode(message)
+	if err != nil {
+		return nil, err
+	}
+
+	// 发送并接收响应
+	respData, err := trans.Send(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// 解码响应
+	return codec.Decode(respData)
 }
 
 func (c *Client) Receive() ([]byte, error) {
