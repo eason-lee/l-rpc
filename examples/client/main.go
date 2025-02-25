@@ -5,9 +5,9 @@ import (
 	"log"
 	"time"
 
-	"lisen/l-rpc/client"
-	"lisen/l-rpc/examples/proto"
-	"lisen/l-rpc/registry"
+	"github.com/eason-lee/l-rpc/client"
+	"github.com/eason-lee/l-rpc/examples/proto"
+	"github.com/eason-lee/l-rpc/registry"
 )
 
 func main() {

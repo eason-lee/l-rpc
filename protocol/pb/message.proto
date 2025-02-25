@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package pb;
 
-option go_package = "lisen/l-rpc/protocol/pb";
+option go_package = "github.com/eason-lee/l-rpc/protocol/pb";
 
 // MessageType 枚举
 enum MessageType {

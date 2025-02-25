@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"sync"
 
-	"lisen/l-rpc/protocol"
-	"lisen/l-rpc/transport"
+	"github.com/eason-lee/l-rpc/protocol"
+	"github.com/eason-lee/l-rpc/transport"
 )
 
 // Service 表示一个服务

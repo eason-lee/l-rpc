@@ -2,7 +2,7 @@ package transport
 
 import (
 	"context"
-	"lisen/l-rpc/protocol"
+	"github.com/eason-lee/l-rpc/protocol"
 	"net"
 	"time"
 )

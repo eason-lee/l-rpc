@@ -6,9 +6,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"lisen/l-rpc/protocol"
-	"lisen/l-rpc/registry"
-	"lisen/l-rpc/transport"
+	"github.com/eason-lee/l-rpc/protocol"
+	"github.com/eason-lee/l-rpc/registry"
+	"github.com/eason-lee/l-rpc/transport"
 )
 
 // Client RPC客户端
